@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Channel Stats</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #e6edf3; background: #0d1117; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 32px 18px; }
+    main { width: min(100%, 980px); margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: end; gap: 18px; flex-wrap: wrap; margin-bottom: 24px; }
+    .eyebrow { color: #8b949e; font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 6px 0 0; font-size: clamp(1.8rem, 5vw, 2.5rem); }
+    p { color: #b1bac4; line-height: 1.55; }
+    button, a.button { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 15px; border: 1px solid #3fb950; border-radius: 8px; background: #238636; color: white; font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; }
+    button:hover, a.button:hover { background: #2ea043; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .toolbar { display: flex; gap: 10px; align-items: center; }
+    .toolbar a.button { border-color: #484f58; background: #21262d; }
+    .toolbar a.button:hover { background: #30363d; }
+    .summary { display: flex; gap: 18px; flex-wrap: wrap; margin: 18px 0; color: #8b949e; font-size: .92rem; }
+    .summary strong { color: #e6edf3; }
+    .panel { overflow: hidden; border: 1px solid #30363d; border-radius: 12px; background: #161b22; }
+    .status { padding: 14px 16px; border-bottom: 1px solid #30363d; color: #8b949e; }
+    .status.error { color: #ff7b72; }
+    .status.ok { color: #3fb950; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 14px 16px; border-bottom: 1px solid #21262d; }
+    th { color: #8b949e; font-size: .82rem; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; }
+    td:last-child, th:last-child { text-align: right; }
+    tr:last-child td { border-bottom: 0; }
+    .empty { padding: 28px 16px; color: #8b949e; text-align: center; }
+    .help { margin-top: 16px; padding: 14px 16px; border-left: 3px solid #d29922; border-radius: 4px; background: #161b22; color: #b1bac4; font-size: .92rem; }
+    code { color: #79c0ff; }
+    footer { margin-top: 18px; color: #8b949e; font-size: .83rem; }
+    @media (max-width: 520px) { th, td { padding: 12px 10px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <div class="eyebrow">Live data</div>
+        <h1>Channel statistics</h1>
+        <p>Channel subscriber counts and growth from public stats feeds.</p>
+      </div>
+      <div class="toolbar">
+        <button id="refresh" type="button">Refresh</button>
+        <a class="button" href="https://github.com/yung1022/miniature-computing-machine">Repository</a>
+      </div>
+    </header>
+
+    <div class="summary" aria-live="polite">
+      <span>Channels shown: <strong id="count">—</strong></span>
+      <span>Subscriber share: <strong id="subscriber-share">—</strong></span>
+      <span>Growth share: <strong id="growth-share">—</strong></span>
+      <span>Updated: <strong id="updated">—</strong></span>
+    </div>
+
+    <section class="panel" aria-label="Channel statistics">
+      <div id="status" class="status" role="status">Loading channel statistics…</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Channel</th><th>Channel ID</th><th>Subscribers (rank)</th><th>Average growth</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div id="empty" class="empty" hidden>No matching channels found.</div>
+      </div>
+    </section>
+
+    <aside class="help">
+      To filter the feed, edit <code>channels.json</code> in the repository and add channel IDs to its <code>channelIds</code> array, for example <code>["channel-id-1", "channel-id-2"]</code>. An empty array shows all channels in the feed. Values are matched as strings.
+    </aside>
+    <footer>Data source: <code>https://fyscs1-private-canada5493.tnstats.dev/public/s9_data</code> and <code>https://public-database.tnstats.dev/s1_growth</code></footer>
+  </main>
+
+  <script>
+    "use strict";
+    const DATA_URL = "https://fyscs1-private-canada5493.tnstats.dev/public/s9_data";
+    const GROWTH_URL = "https://public-database.tnstats.dev/s1_growth";
+    const CONFIG_URL = "./channels.json";
+    const REFRESH_INTERVAL_MS = 30_000;
+    const rows = document.getElementById("rows");
+    const statusEl = document.getElementById("status");
+    const emptyEl = document.getElementById("empty");
+    const countEl = document.getElementById("count");
+    const subscriberShareEl = document.getElementById("subscriber-share");
+    const growthShareEl = document.getElementById("growth-share");
+    const updatedEl = document.getElementById("updated");
+    const refreshButton = document.getElementById("refresh");
+    let loading = false;
+
+    function firstValue(obj, keys) {
+      for (const key of keys) {
+        if (obj && obj[key] !== undefined && obj[key] !== null) return obj[key];
+      }
+      return undefined;
+    }
+
+    function extractChannels(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (!payload || typeof payload !== "object") throw new Error("Unexpected stats response format.");
+      for (const key of ["channels", "data", "results", "items", "list"]) {
+        if (Array.isArray(payload[key])) return payload[key];
+        if (payload[key] && typeof payload[key] === "object") {
+          for (const nestedKey of ["channels", "items", "results"]) {
+            if (Array.isArray(payload[key][nestedKey])) return payload[key][nestedKey];
+          }
+        }
+      }
+      throw new Error("Could not find a channel list in the stats response.");
+    }
+
+    function extractGrowthList(payload) {
+      if (Array.isArray(payload)) return payload;
+      if (!payload || typeof payload !== "object") throw new Error("Unexpected growth response format.");
+      for (const key of ["data", "results", "growth", "items", "list"]) {
+        if (Array.isArray(payload[key])) return payload[key];
+        if (payload[key] && typeof payload[key] === "object") {
+          for (const nestedKey of ["data", "results", "growth", "items", "list"]) {
+            if (Array.isArray(payload[key][nestedKey])) return payload[key][nestedKey];
+          }
+        }
+      }
+      throw new Error("Could not find a growth list in the response.");
+    }
+
+    function normalizeChannel(item) {
+      if (!item || typeof item !== "object") return null;
+      const id = firstValue(item, ["cid", "channelId", "channel_id", "channelID", "id"]);
+      const name = firstValue(item, ["cname", "channelName", "channel_name", "name", "title", "channel"]);
+      const subscribers = firstValue(item, ["subscriberCountRealAPI", "subscribers", "subscriberCount", "subscriber_count", "subscribers_count", "count"]);
+      if (id === undefined) return null;
+      return {
+        id: String(id),
+        name: name === undefined ? String(id) : String(name),
+        subscribers: subscribers === undefined ? "—" : subscribers
+      };
+    }
+
+    function buildGrowthMap(growthList) {
+      const map = new Map();
+      for (const item of growthList) {
+        if (!item || item.cid === undefined || item.cid === null) continue;
+        const max = Number(item.subGainMax);
+        const min = Number(item.subGainMin);
+        if (!Number.isFinite(max) || !Number.isFinite(min)) continue;
+        map.set(String(item.cid), (max + min) / 2);
+      }
+      return map;
+    }
+
+    function toNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function formatCount(value) {
+      const n = Number(value);
+      return value !== "" && Number.isFinite(n) ? new Intl.NumberFormat().format(n) : String(value);
+    }
+
+    function buildRankMap(channels) {
+      const ranked = [...channels]
+        .filter((channel) => Number.isFinite(toNumber(channel.subscribers)))
+        .sort((a, b) => toNumber(b.subscribers) - toNumber(a.subscribers));
+      const rankMap = new Map();
+      ranked.forEach((channel, index) => rankMap.set(channel.id, index + 1));
+      return rankMap;
+    }
+
+    function formatShare(numerator, denominator) {
+      const percentage = denominator !== 0 ? (numerator / denominator) * 100 : 0;
+      return `${percentage.toLocaleString(undefined, { maximumFractionDigits: 6 })}%`;
+    }
+
+    function setStatus(message, kind) {
+      statusEl.textContent = message;
+      statusEl.className = `status${kind ? ` ${kind}` : ""}`;
+    }
+
+    async function loadStats() {
+      if (loading) return;
+      loading = true;
+      refreshButton.disabled = true;
+      setStatus("Loading channel statistics…");
+      emptyEl.hidden = true;
+      try {
+        const [dataResponse, growthResponse, configResponse] = await Promise.all([
+          fetch(DATA_URL, { cache: "no-store" }),
+          fetch(GROWTH_URL, { cache: "no-store" }),
+          fetch(CONFIG_URL, { cache: "no-store" })
+        ]);
+        if (!dataResponse.ok) throw new Error(`Stats endpoint returned HTTP ${dataResponse.status}.`);
+        if (!growthResponse.ok) throw new Error(`Growth endpoint returned HTTP ${growthResponse.status}.`);
+        if (!configResponse.ok) throw new Error(`Could not load channels.json (HTTP ${configResponse.status}).`);
+
+        const [payload, growthPayload, config] = await Promise.all([
+          dataResponse.json(),
+          growthResponse.json(),
+          configResponse.json()
+        ]);
+        const configuredIds = Array.isArray(config.channelIds) ? config.channelIds.map(String) : [];
+        const allowed = new Set(configuredIds);
+        const fullChannels = extractChannels(payload).map(normalizeChannel).filter(Boolean);
+        const growthById = buildGrowthMap(extractGrowthList(growthPayload));
+        const fullRankMap = buildRankMap(fullChannels);
+        const shownChannels = fullChannels.filter((channel) => allowed.size === 0 || allowed.has(channel.id));
+
+        const fullSubscribersTotal = fullChannels.reduce((sum, channel) => sum + toNumber(channel.subscribers), 0);
+        const shownSubscribersTotal = shownChannels.reduce((sum, channel) => sum + toNumber(channel.subscribers), 0);
+        const fullGrowthTotal = fullChannels.reduce((sum, channel) => sum + (growthById.get(channel.id) ?? 0), 0);
+        const shownGrowthTotal = shownChannels.reduce((sum, channel) => sum + (growthById.get(channel.id) ?? 0), 0);
+
+        const combinedSubscriberEntry = { id: "combined-subscribers", subscribers: shownSubscribersTotal };
+        const combinedSubscriberRank = buildRankMap([...fullChannels, combinedSubscriberEntry]).get(combinedSubscriberEntry.id) || 0;
+
+        rows.replaceChildren();
+        for (const channel of shownChannels) {
+          const tr = document.createElement("tr");
+          const growth = growthById.get(channel.id);
+          const values = [
+            channel.name,
+            channel.id,
+            `${formatCount(channel.subscribers)} (#${fullRankMap.get(channel.id) || 0})`,
+            growth === undefined ? "—" : formatCount(growth)
+          ];
+          for (const text of values) {
+            const td = document.createElement("td");
+            td.textContent = text;
+            tr.appendChild(td);
+          }
+          rows.appendChild(tr);
+        }
+
+        const combinedTr = document.createElement("tr");
+        for (const text of [
+          "Combined totals",
+          "combined",
+          `${formatCount(shownSubscribersTotal)} (#${combinedSubscriberRank})`,
+          formatCount(shownGrowthTotal)
+        ]) {
+          const td = document.createElement("td");
+          td.textContent = text;
+          combinedTr.appendChild(td);
+        }
+        rows.appendChild(combinedTr);
+
+        countEl.textContent = new Intl.NumberFormat().format(shownChannels.length);
+        subscriberShareEl.textContent = formatShare(shownSubscribersTotal, fullSubscribersTotal);
+        growthShareEl.textContent = formatShare(shownGrowthTotal, fullGrowthTotal);
+        updatedEl.textContent = new Date().toLocaleTimeString();
+        emptyEl.hidden = shownChannels.length !== 0 || shownSubscribersTotal !== 0;
+        setStatus(`Loaded ${shownChannels.length} channel${shownChannels.length === 1 ? "" : "s"}.`, "ok");
+      } catch (error) {
+        setStatus(`${error.message} If this is a CORS error, the stats server must allow this page's origin.`, "error");
+        countEl.textContent = "—";
+        subscriberShareEl.textContent = "—";
+        growthShareEl.textContent = "—";
+        emptyEl.hidden = true;
+      } finally {
+        loading = false;
+        refreshButton.disabled = false;
+      }
+    }
+
+    refreshButton.addEventListener("click", loadStats);
+    loadStats();
+    setInterval(loadStats, REFRESH_INTERVAL_MS);
+  </script>
+</body>
+</html>
