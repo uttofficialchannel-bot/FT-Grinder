@@ -6,270 +6,683 @@
   <meta name="color-scheme" content="light dark">
   <title>Channel Stats</title>
   <style>
-    :root { color-scheme: dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #e6edf3; background: #0d1117; }
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; color: #e6edf3; background: #0d1117; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; padding: 32px 18px; }
-    main { width: min(100%, 980px); margin: 0 auto; }
-    header { display: flex; justify-content: space-between; align-items: end; gap: 18px; flex-wrap: wrap; margin-bottom: 24px; }
-    .eyebrow { color: #8b949e; font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-    h1 { margin: 6px 0 0; font-size: clamp(1.8rem, 5vw, 2.5rem); }
-    p { color: #b1bac4; line-height: 1.55; }
-    button, a.button { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 15px; border: 1px solid #3fb950; border-radius: 8px; background: #238636; color: white; font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; }
-    button:hover, a.button:hover { background: #2ea043; }
-    button:disabled { opacity: .6; cursor: wait; }
-    .toolbar { display: flex; gap: 10px; align-items: center; }
-    .toolbar a.button { border-color: #484f58; background: #21262d; }
-    .toolbar a.button:hover { background: #30363d; }
-    .summary { display: flex; gap: 18px; flex-wrap: wrap; margin: 18px 0; color: #8b949e; font-size: .92rem; }
-    .summary strong { color: #e6edf3; }
-    .panel { overflow: hidden; border: 1px solid #30363d; border-radius: 12px; background: #161b22; }
-    .status { padding: 14px 16px; border-bottom: 1px solid #30363d; color: #8b949e; }
-    .status.error { color: #ff7b72; }
-    .status.ok { color: #3fb950; }
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; text-align: left; }
-    th, td { padding: 14px 16px; border-bottom: 1px solid #21262d; }
-    th { color: #8b949e; font-size: .82rem; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; }
-    td:last-child, th:last-child { text-align: right; }
-    tr:last-child td { border-bottom: 0; }
-    .empty { padding: 28px 16px; color: #8b949e; text-align: center; }
-    .help { margin-top: 16px; padding: 14px 16px; border-left: 3px solid #d29922; border-radius: 4px; background: #161b22; color: #b1bac4; font-size: .92rem; }
-    code { color: #79c0ff; }
-    footer { margin-top: 18px; color: #8b949e; font-size: .83rem; }
-    @media (max-width: 520px) { th, td { padding: 12px 10px; } }
+    main { width: min(100%, 1100px); margin: auto; }
+    header { display:flex; justify-content:space-between; align-items:end; gap:18px; flex-wrap:wrap; margin-bottom:24px; }
+    h1 { margin:6px 0 0; font-size:clamp(1.8rem,5vw,2.5rem); }
+    h2 { margin:0 0 12px; font-size:1.1rem; }
+    p { color:#b1bac4; line-height:1.55; }
+    button,a.button { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 15px; border:1px solid #3fb950; border-radius:8px; background:#238636; color:white; font:inherit; font-weight:650; text-decoration:none; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:wait; }
+    .toolbar { display:flex; gap:10px; }
+    .toolbar a.button { border-color:#484f58; background:#21262d; }
+    .summary { display:flex; gap:18px; flex-wrap:wrap; margin:18px 0; color:#8b949e; font-size:.92rem; }
+    .summary strong { color:#e6edf3; }
+    .summary .odometer { display:inline-flex; align-items:baseline; gap:7px; }
+    .summary .odometer strong { color:#7ee787; font-variant-numeric:tabular-nums; }
+    .summary .odometer small { color:#8b949e; font-size:.78rem; }
+    .status,.card { border:1px solid #30363d; border-radius:12px; background:#161b22; }
+    .status { padding:13px 16px; color:#8b949e; }
+    .status.error { color:#ff7b72; }
+    .status.ok { color:#3fb950; }
+    .charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr)); gap:16px; margin:16px 0 24px; }
+    .card { padding:16px; min-width:0; }
+    .card p { margin:-5px 0 10px; color:#8b949e; font-size:.85rem; }
+    .chart { width:100%; height:260px; display:block; }
+    .gridline { stroke:#30363d; stroke-width:1; }
+    .axis-label { fill:#8b949e; font:11px system-ui,sans-serif; }
+    .series-line { fill:none; stroke-width:2; }
+    .series-line.dashed { stroke-dasharray:6 4; }
+    .graph-controls { display:inline-flex; margin:0 0 14px; padding:3px; border:1px solid #484f58; border-radius:8px; background:#161b22; }
+    .graph-controls button { min-height:34px; padding:0 12px; border:0; border-radius:5px; background:transparent; color:#b1bac4; font:inherit; cursor:pointer; }
+    .graph-controls button[aria-pressed="true"] { background:#238636; color:#fff; }
+    article.card > div[id^="chart-"] { position:relative; }
+    .scrub-line { stroke:#e6edf3; stroke-opacity:.55; stroke-width:1; stroke-dasharray:4 3; pointer-events:none; }
+    .active-point { stroke:#fff; stroke-width:2; pointer-events:none; }
+    .scrub-area { fill:transparent; cursor:crosshair; touch-action:pan-y; }
+    .chart-tooltip { position:absolute; z-index:4; max-width:min(300px,85%); padding:7px 10px; border:1px solid #6e7681; border-radius:7px; background:#f0f6fc; color:#0d1117; font:600 12px/1.45 system-ui,sans-serif; white-space:normal; box-shadow:0 4px 14px #0008; transform:translate(-50%,calc(-100% - 9px)); pointer-events:none; }
+    .chart-tooltip.below { transform:translate(-50%,9px); }
+    .chart-legend { display:flex; flex-wrap:wrap; gap:8px 14px; margin:4px 0 0; color:#b1bac4; font-size:.8rem; }
+    .chart-legend .swatch { flex:none; }
+    .chart-legend .swatch.dashed { height:0; border-top:2px dashed currentColor; border-radius:0; }
+    .legend { display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:8px; color:#b1bac4; font-size:.8rem; }
+    .legend-item { display:inline-flex; align-items:center; gap:6px; }
+    .swatch { width:11px; height:3px; border-radius:2px; }
+    .milestones { margin:24px 0; }
+    .milestones p { color:#8b949e; font-size:.86rem; }
+    .milestones table { font-variant-numeric:tabular-nums; }
+    .milestone-calculator { display:grid; grid-template-columns:minmax(180px,1fr) minmax(150px,.7fr) auto; gap:12px; align-items:end; margin:16px 0; }
+    .milestone-calculator label { display:grid; gap:6px; color:#b1bac4; font-size:.9rem; }
+    .milestone-calculator select,.milestone-calculator input { width:100%; min-height:42px; padding:8px 10px; border:1px solid #484f58; border-radius:6px; background:#0d1117; color:#e6edf3; font:inherit; }
+    .table-wrap { overflow-x:auto; margin:18px 0; }
+    table { width:100%; border-collapse:collapse; text-align:left; background:#161b22; border-radius:12px; overflow:hidden; }
+    th,td { padding:13px 15px; border-bottom:1px solid #30363d; }
+    th { color:#8b949e; text-transform:uppercase; font-size:.8rem; }
+    td:last-child,th:last-child { text-align:right; }
+    .help,footer { color:#8b949e; font-size:.86rem; }
+    .help { margin:18px 0; }
+    @media(max-width:520px) { body { padding:22px 12px; } .chart { height:220px; } th,td { padding:10px 8px; } }
   </style>
 </head>
 <body>
-  <main>
-    <header>
-      <div>
-        <div class="eyebrow">Live data</div>
-        <h1>Channel statistics</h1>
-        <p>Channel subscriber counts and growth from public stats feeds.</p>
-      </div>
-      <div class="toolbar">
-        <button id="refresh" type="button">Refresh</button>
-        <a class="button" href="https://github.com/yung1022/miniature-computing-machine">Repository</a>
-      </div>
-    </header>
-
-    <div class="summary" aria-live="polite">
-      <span>Channels shown: <strong id="count">—</strong></span>
-      <span>Subscriber share: <strong id="subscriber-share">—</strong></span>
-      <span>Growth share: <strong id="growth-share">—</strong></span>
-      <span>Updated: <strong id="updated">—</strong></span>
+<main>
+  <header>
+    <div><div>Live data</div><h1>Channel statistics</h1><p>Subscriber counts, growth, and historical graph snapshots.</p></div>
+    <div class="toolbar"><button id="refresh" type="button">Refresh</button><a class="button" href="https://github.com/yung1022/miniature-computing-machine">Repository</a></div>
+  </header>
+  <div class="summary" aria-live="polite">
+    <span>Channels shown: <strong id="count">—</strong></span>
+    <span class="odometer" aria-live="off">Total subscribers: <strong id="subscriber-odometer">—</strong><small id="odometer-status">Waiting for live data</small></span>
+    <span>Subscriber share: <strong id="subscriber-share">—</strong></span>
+    <span>Growth share: <strong id="growth-share">—</strong></span>
+    <span>Updated: <strong id="updated">—</strong></span>
+  </div>
+  <section aria-label="Historical graph statistics">
+    <h2>Graph stats</h2>
+    <div class="graph-controls" role="group" aria-label="Graph time range">
+      <button type="button" data-graph-range="all" aria-pressed="true">All time</button>
+      <button type="button" data-graph-range="day" aria-pressed="false">1 day</button>
     </div>
+    <div id="chart-status" class="status" role="status">Loading graph history…</div>
+    <div class="charts">
+      <article class="card"><h2>Subscriber share</h2><p>Shown channels' share of all feed subscribers</p><div id="chart-subscriber-share"></div></article>
+      <article class="card"><h2>Growth share</h2><p>Shown channels' share of all feed growth</p><div id="chart-growth-share"></div></article>
+      <article class="card"><h2>Total subscribers</h2><p>Combined subscribers for shown channels</p><div id="chart-total-subscribers"></div></article>
+      <article class="card"><h2>Subscribers by channel</h2><p>Shown channel series</p><div id="chart-channel-subscribers"></div><div id="legend-channel-subscribers" class="legend"></div></article>
+      <article class="card"><h2>Total growth</h2><p>Combined average growth for shown channels</p><div id="chart-total-growth"></div></article>
+      <article class="card"><h2>Global growth</h2><p>Estimated all-feed growth, derived from shown total growth and its share</p><div id="chart-global-growth"></div></article>
+      <article class="card"><h2>Growth by channel</h2><p>Shown channel series</p><div id="chart-channel-growth"></div><div id="legend-channel-growth" class="legend"></div></article>
+    </div>
+  </section>
+  <div id="status" class="status" role="status">Loading channel statistics…</div>
+  <h2>Shown channels</h2>
+  <div class="table-wrap"><table><thead><tr><th>Channel</th><th>Channel ID</th><th>Subscribers (rank)</th><th>Growth</th></tr></thead><tbody id="rows"></tbody></table></div>
+  <h2>Excluded channels</h2>
+  <div class="table-wrap"><table><thead><tr><th>Channel</th><th>Channel ID</th><th>Subscribers</th><th>Growth</th></tr></thead><tbody id="excluded-rows"></tbody></table></div>
+  <section class="milestones" aria-label="Estimated milestones">
+    <h2>Estimated milestones</h2>
+    <p>Projections use 30-minute median buckets from the latest 24 hours. Unstable or declining trends are not assigned an estimated date.</p>
+    <div class="table-wrap"><table><thead><tr><th>Metric</th><th>Next milestone</th><th>Estimated time</th><th>Trend fit</th></tr></thead><tbody id="milestone-rows"><tr><td colspan="4">Waiting for graph history…</td></tr></tbody></table></div>
+    <h3>Find a target time</h3>
+    <form id="milestone-calculator" class="milestone-calculator">
+      <label for="milestone-metric">Metric<select id="milestone-metric" required></select></label>
+      <label for="milestone-target">Target value<input id="milestone-target" type="number" step="any" required></label>
+      <button type="submit">Estimate time</button>
+    </form>
+    <div id="milestone-result" class="status" role="status" aria-live="polite">Choose a metric and enter a target.</div>
+  </section>
+  <p class="help">Configure included IDs with <code>channelIds</code> and excluded IDs with <code>excludedChannelIds</code> in <code>channels.json</code>. Excluded channels stay in the full-feed share denominators and appear in the separate list, but are omitted from shown totals and graphs.</p>
+  <footer>Data sources: subscriber and growth public feeds; historical snapshots from <code>data/graph-stats.json</code>.</footer>
+</main>
+<script>
+"use strict";
+const DATA_URL="https://fyscs1-private-canada5493.tnstats.dev/public/s9_data";
+const GROWTH_URL="https://public-database.tnstats.dev/s1_growth";
+const CONFIG_URL="./channels.json";
+const HISTORY_URL="./data/graph-stats.json";
+const REFRESH_MS=30000;
+const COLORS=["#58a6ff","#3fb950","#f0883e","#bc8cff","#ff7b72","#39c5cf","#d2a8ff","#e3b341","#f778ba","#7ee787","#ffa657","#8b949e"];
+const $=id=>document.getElementById(id);
+let history=[];
+let loading=false;
+function firstValue(obj,keys){for(const key of keys)if(obj&&obj[key]!==undefined&&obj[key]!==null)return obj[key];}
+function number(value){const n=typeof value==="string"?Number(value.replaceAll(",","")):Number(value);return Number.isFinite(n)?n:0;}
+function fmt(value){return new Intl.NumberFormat().format(number(value));}
+function setStatus(el,text,kind=""){el.textContent=text;el.className=`status${kind?` ${kind}`:""}`;}
+function extractList(payload,kind){if(Array.isArray(payload))return payload;if(!payload||typeof payload!=="object")throw new Error(`Unexpected ${kind} response format.`);const keys=kind==="channels"?["channels","data","results","items","list"]:["data","results","growth","items","list"];for(const key of keys){if(Array.isArray(payload[key]))return payload[key];if(payload[key]&&typeof payload[key]==="object")for(const nested of keys)if(Array.isArray(payload[key][nested]))return payload[key][nested];}throw new Error(`Could not find ${kind} list.`);}
+function channelId(item){return String(item.channelId??item.cid??item.id??item.channelName??"unknown");}
+function populateTable(target,channels,growthMap,rankMap,ranked){target.replaceChildren();if(!channels.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=4;td.textContent="No channels in this list.";tr.append(td);target.append(tr);return;}for(const c of channels){const tr=document.createElement("tr");const values=ranked?[c.name,c.id,`${fmt(c.subscribers)} (#${rankMap.get(c.id)??"—"})`,growthMap.has(c.id)?fmt(growthMap.get(c.id)):"—"]:[c.name,c.id,fmt(c.subscribers),growthMap.has(c.id)?fmt(growthMap.get(c.id)):"—"];for(const value of values){const td=document.createElement("td");td.textContent=value;tr.append(td);}target.append(tr);}}
 
-    <section class="panel" aria-label="Channel statistics">
-      <div id="status" class="status" role="status">Loading channel statistics…</div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Channel</th><th>Channel ID</th><th>Subscribers (rank)</th><th>Average growth</th></tr></thead>
-          <tbody id="rows"></tbody>
-        </table>
-        <div id="empty" class="empty" hidden>No matching channels found.</div>
-      </div>
-    </section>
+function renderChart(targetId,series,percent=false){const target=$(targetId);const width=Math.max(300,target.clientWidth||420),height=260,left=66,right=12,top=14,bottom=38,pw=width-left-right,ph=height-top-bottom;const vals=series.flatMap(s=>s.values.map(p=>p.value).filter(Number.isFinite));if(!history.length||!vals.length){target.innerHTML='<div class="status">No graph snapshots yet.</div>';return;}let min=Math.min(...vals),max=Math.max(...vals);if(min===max){const pad=Math.abs(min)*.05||1;min-=pad;max+=pad;}const x=i=>left+(history.length<=1?pw/2:i/(history.length-1)*pw),y=v=>top+(max-v)/(max-min)*ph;const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox",`0 0 ${width} ${height}`);svg.setAttribute("class","chart");svg.setAttribute("role","img");svg.setAttribute("aria-label","Historical graph");const add=(tag,attrs)=>{const el=document.createElementNS("http://www.w3.org/2000/svg",tag);for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);svg.append(el);return el;};const axis=v=>percent?`${v.toLocaleString(undefined,{maximumFractionDigits:3})}%`:new Intl.NumberFormat(undefined,{notation:"compact",maximumFractionDigits:2}).format(v);for(let t=0;t<=4;t++){const v=min+(max-min)*t/4,yy=y(v);add("line",{x1:left,y1:yy,x2:width-right,y2:yy,class:"gridline"});const label=add("text",{x:left-8,y:yy+4,"text-anchor":"end",class:"axis-label"});label.textContent=axis(v);}for(const i of [...new Set([0,Math.floor((history.length-1)/2),history.length-1])]){const d=new Date(history[i].timestamp),label=Number.isNaN(d.getTime())?String(i+1):d.toLocaleDateString(undefined,{month:"short",day:"numeric"});const text=add("text",{x:x(i),y:height-12,"text-anchor":"middle",class:"axis-label"});text.textContent=label;}series.forEach((s,si)=>{const color=s.color||COLORS[si%COLORS.length];let d="",drawing=false;s.values.forEach((p,i)=>{if(!Number.isFinite(p.value)){drawing=false;return;}d+=`${drawing?" L":"M"}${x(i)},${y(p.value)}`;drawing=true;});add("path",{d,class:"series-line",stroke:color});});target.replaceChildren(svg);}
+function groupedSeries(key,targetId,legendId){const ids=new Map();for(const snap of history)for(const item of(Array.isArray(snap[key])?snap[key]:[])){const id=channelId(item);if(!ids.has(id))ids.set(id,item.channelName||id);}const entries=[...ids].map(([id,name],si)=>({id,name,color:COLORS[si%COLORS.length],values:history.map(snap=>{const found=(Array.isArray(snap[key])?snap[key]:[]).find(item=>channelId(item)===id);return{value:found?number(found.value??found.subscribers??found.growth):NaN};})}));const legend=$(legendId);legend.replaceChildren();for(const s of entries){const item=document.createElement("span");item.className="legend-item";const swatch=document.createElement("i");swatch.className="swatch";swatch.style.background=s.color;const label=document.createElement("span");label.textContent=s.name;item.append(swatch,label);legend.append(item);}renderChart(targetId,entries);}
+function snapshotValue(snapshot,key){return Number(snapshot[key]);}
+function renderCharts(){const scalar=(key,id,label,color,percent=false)=>renderChart(id,[{name:label,color,values:history.map(s=>({value:snapshotValue(s,key)}))}],percent);scalar("subscriberShare","chart-subscriber-share","Subscriber share",COLORS[0],true);scalar("growthShare","chart-growth-share","Growth share",COLORS[1],true);scalar("totalSubscribers","chart-total-subscribers","Total subscribers",COLORS[2]);scalar("totalGrowth","chart-total-growth","Total growth",COLORS[3]);renderChart("chart-global-growth",[{name:"Global growth",color:COLORS[4],values:history.map(s=>{const share=Number(s.growthShare),total=Number(s.totalGrowth);return{value:Number.isFinite(share)&&share!==0&&Number.isFinite(total)?total/(share/100):NaN};})}]);groupedSeries("channelSubscribers","chart-channel-subscribers","legend-channel-subscribers");groupedSeries("channelGrowth","chart-channel-growth","legend-channel-growth");}
 
-    <aside class="help">
-      To filter the feed, edit <code>channels.json</code> in the repository and add channel IDs to its <code>channelIds</code> array, for example <code>["channel-id-1", "channel-id-2"]</code>. An empty array shows all channels in the feed. Values are matched as strings.
-    </aside>
-    <footer>Data source: <code>https://fyscs1-private-canada5493.tnstats.dev/public/s9_data</code> and <code>https://public-database.tnstats.dev/s1_growth</code></footer>
-  </main>
-
-  <script>
-    "use strict";
-    const DATA_URL = "https://fyscs1-private-canada5493.tnstats.dev/public/s9_data";
-    const GROWTH_URL = "https://public-database.tnstats.dev/s1_growth";
-    const CONFIG_URL = "./channels.json";
-    const REFRESH_INTERVAL_MS = 30_000;
-    const rows = document.getElementById("rows");
-    const statusEl = document.getElementById("status");
-    const emptyEl = document.getElementById("empty");
-    const countEl = document.getElementById("count");
-    const subscriberShareEl = document.getElementById("subscriber-share");
-    const growthShareEl = document.getElementById("growth-share");
-    const updatedEl = document.getElementById("updated");
-    const refreshButton = document.getElementById("refresh");
-    let loading = false;
-
-    function firstValue(obj, keys) {
-      for (const key of keys) {
-        if (obj && obj[key] !== undefined && obj[key] !== null) return obj[key];
-      }
-      return undefined;
-    }
-
-    function extractChannels(payload) {
-      if (Array.isArray(payload)) return payload;
-      if (!payload || typeof payload !== "object") throw new Error("Unexpected stats response format.");
-      for (const key of ["channels", "data", "results", "items", "list"]) {
-        if (Array.isArray(payload[key])) return payload[key];
-        if (payload[key] && typeof payload[key] === "object") {
-          for (const nestedKey of ["channels", "items", "results"]) {
-            if (Array.isArray(payload[key][nestedKey])) return payload[key][nestedKey];
-          }
-        }
-      }
-      throw new Error("Could not find a channel list in the stats response.");
-    }
-
-    function extractGrowthList(payload) {
-      if (Array.isArray(payload)) return payload;
-      if (!payload || typeof payload !== "object") throw new Error("Unexpected growth response format.");
-      for (const key of ["data", "results", "growth", "items", "list"]) {
-        if (Array.isArray(payload[key])) return payload[key];
-        if (payload[key] && typeof payload[key] === "object") {
-          for (const nestedKey of ["data", "results", "growth", "items", "list"]) {
-            if (Array.isArray(payload[key][nestedKey])) return payload[key][nestedKey];
-          }
-        }
-      }
-      throw new Error("Could not find a growth list in the response.");
-    }
-
-    function normalizeChannel(item) {
-      if (!item || typeof item !== "object") return null;
+async function refreshHistory(){try{const response=await fetch(`${HISTORY_URL}?_=${Date.now()}`,{cache:"no-store"});if(!response.ok)throw new Error(`Graph history returned HTTP ${response.status}.`);const loaded=await response.json();history=Array.isArray(loaded)?loaded:[];renderCharts();setStatus($("chart-status"),`Loaded ${history.length} snapshot${history.length===1?"":"s"}.`,"ok");}catch(error){setStatus($("chart-status"),error.message,"error");}}
+async function loadStats() {
+  if (loading) return;
+  loading = true;
+  $("refresh").disabled = true;
+  setStatus($("status"), "Loading channel statistics…");
+  try {
+    const responses = await Promise.all([
+      fetch(DATA_URL, { cache: "no-store" }),
+      fetch(GROWTH_URL, { cache: "no-store" }),
+      fetch(CONFIG_URL, { cache: "no-store" })
+    ]);
+    if (responses.some(response => !response.ok)) throw new Error("A stats, growth, or channel configuration request failed.");
+    const [stats, growth, config] = await Promise.all(responses.map(response => response.json()));
+    const channels = extractList(stats, "channels").map(item => {
       const id = firstValue(item, ["cid", "channelId", "channel_id", "channelID", "id"]);
-      const name = firstValue(item, ["cname", "channelName", "channel_name", "name", "title", "channel"]);
-      const subscribers = firstValue(item, ["subscriberCountRealAPI", "subscribers", "subscriberCount", "subscriber_count", "subscribers_count", "count"]);
-      if (id === undefined) return null;
+      if (id == null) return null;
       return {
         id: String(id),
-        name: name === undefined ? String(id) : String(name),
-        subscribers: subscribers === undefined ? "—" : subscribers
+        name: String(firstValue(item, ["cname", "channelName", "channel_name", "name", "title", "channel"]) ?? id),
+        subscribers: firstValue(item, ["subscriberCountRealAPI", "subscribers", "subscriberCount", "subscriber_count", "subscribers_count", "count"]) ?? 0
       };
+    }).filter(Boolean);
+    const growthMap = new Map();
+    for (const item of extractList(growth, "growth")) {
+      if (item?.cid == null) continue;
+      const value = Number(item.subGainMax);
+      if (Number.isFinite(value)) growthMap.set(String(item.cid), value);
+    }
+    const included = new Set(Array.isArray(config.channelIds) ? config.channelIds.map(String) : []);
+    const excludedIds = new Set(Array.isArray(config.excludedChannelIds) ? config.excludedChannelIds.map(String) : []);
+    const configured = channels.filter(channel => included.size === 0 || included.has(channel.id));
+    const shown = configured.filter(channel => !excludedIds.has(channel.id));
+    const excluded = configured.filter(channel => excludedIds.has(channel.id));
+    const ranks = new Map([...channels]
+      .sort((a, b) => number(b.subscribers) - number(a.subscribers))
+      .map((channel, index) => [channel.id, index + 1]));
+
+    populateTable($("rows"), shown, growthMap, ranks, true);
+    populateTable($("excluded-rows"), excluded, growthMap, ranks, false);
+
+    const allSubscribers = channels.reduce((sum, channel) => sum + number(channel.subscribers), 0);
+    const shownSubscribers = shown.reduce((sum, channel) => sum + number(channel.subscribers), 0);
+    const allGrowth = channels.reduce((sum, channel) => sum + (growthMap.get(channel.id) ?? 0), 0);
+    const shownGrowth = shown.reduce((sum, channel) => sum + (growthMap.get(channel.id) ?? 0), 0);
+    $("count").textContent = fmt(shown.length);
+    $("subscriber-share").textContent = `${(allSubscribers ? shownSubscribers / allSubscribers * 100 : 0).toLocaleString(undefined, { maximumFractionDigits: 6 })}%`;
+    $("growth-share").textContent = `${(allGrowth ? shownGrowth / allGrowth * 100 : 0).toLocaleString(undefined, { maximumFractionDigits: 6 })}%`;
+    $("updated").textContent = new Date().toLocaleTimeString();
+    setStatus($("status"), `Loaded ${shown.length} shown channel${shown.length === 1 ? "" : "s"} and ${excluded.length} excluded channel${excluded.length === 1 ? "" : "s"}.`, "ok");
+  } catch (error) {
+    setStatus($("status"), error.message, "error");
+  } finally {
+    loading = false;
+    $("refresh").disabled = false;
+  }
+}
+
+$("refresh").addEventListener("click", () => { loadStats(); refreshHistory(); });
+window.addEventListener("resize", renderCharts);
+loadStats();
+refreshHistory();
+setInterval(() => { loadStats(); refreshHistory(); }, REFRESH_MS);
+</script>
+<script>
+"use strict";
+(() => {
+  const previousRenderCharts = window.renderCharts;
+  window.removeEventListener("resize", previousRenderCharts);
+  let selectedRange = "all";
+  let milestoneMetrics = [];
+  let odometerBase = NaN;
+  let odometerAnchor = 0;
+  let odometerRefresh = "";
+  let odometerRate = 0;
+  const liveSubscriberSamples = [];
+  const ODOMETER_REFRESH_MS = 3000;
+  const ODOMETER_MAX_AGE_MS = 45000;
+
+  const recentSubscriberRate = () => {
+    const points = history
+      .map(snapshot => ({ timestamp: Date.parse(snapshot.timestamp), value: Number(snapshot.totalSubscribers) }))
+      .filter(point => Number.isFinite(point.timestamp) && Number.isFinite(point.value));
+    if (points.length < 3) return 0;
+    const newest = points.reduce((latest, point) => Math.max(latest, point.timestamp), -Infinity);
+    if (newest > Date.now() + 60000 || Date.now() - newest > 15 * 60 * 1000) return 0;
+    const recent = points.filter(point => point.timestamp >= newest - 6 * 60 * 60 * 1000).sort((a, b) => a.timestamp - b.timestamp);
+    if (recent.length < 3 || recent.at(-1).timestamp - recent[0].timestamp < 30 * 60 * 1000) return 0;
+    const origin = recent[0].timestamp;
+    const hours = recent.map(point => (point.timestamp - origin) / 3600000);
+    const meanHours = hours.reduce((sum, value) => sum + value, 0) / hours.length;
+    const meanValue = recent.reduce((sum, point) => sum + point.value, 0) / recent.length;
+    const variance = hours.reduce((sum, value) => sum + (value - meanHours) ** 2, 0);
+    const covariance = recent.reduce((sum, point, index) => sum + (hours[index] - meanHours) * (point.value - meanValue), 0);
+    return variance ? covariance / variance / 3600 : 0;
+  };
+
+  const observedSubscriberRate = () => {
+    if (liveSubscriberSamples.length < 2) return null;
+    const newest = liveSubscriberSamples.at(-1).timestamp;
+    const recent = liveSubscriberSamples.filter(sample => sample.timestamp >= newest - 5 * 60 * 1000);
+    const rates = [];
+    for (let index = 1; index < recent.length; index++) {
+      const elapsed = (recent[index].timestamp - recent[index - 1].timestamp) / 1000;
+      if (elapsed < 15 || elapsed > 3 * REFRESH_MS / 1000) continue;
+      rates.push((recent[index].value - recent[index - 1].value) / elapsed);
+    }
+    return rates.length ? median(rates) : null;
+  };
+
+  const updateSubscriberOdometer = () => {
+    const refresh = $("updated").textContent;
+    const rows = [...$("rows").rows];
+    const total = rows.reduce((sum, row) => {
+      if (row.cells.length < 4) return sum;
+      const value = Number(row.cells[2].textContent.split(" (#")[0].replace(/\D/g, ""));
+      return Number.isFinite(value) ? sum + value : sum;
+    }, 0);
+    if (refresh !== "—" && refresh !== odometerRefresh && rows.length) {
+      odometerBase = total;
+      odometerAnchor = Date.now();
+      odometerRefresh = refresh;
+      liveSubscriberSamples.push({ timestamp: odometerAnchor, value: total });
+      if (liveSubscriberSamples.length > 12) liveSubscriberSamples.shift();
+      odometerRate = observedSubscriberRate() ?? recentSubscriberRate();
+    }
+    if (!Number.isFinite(odometerBase)) return;
+    const elapsed = Math.max(0, Date.now() - odometerAnchor);
+    const estimatedElapsed = Math.min(elapsed, ODOMETER_MAX_AGE_MS);
+    $("subscriber-odometer").textContent = new Intl.NumberFormat().format(Math.max(0, Math.floor(odometerBase + odometerRate * estimatedElapsed / 1000)));
+    $("odometer-status").textContent = elapsed > ODOMETER_MAX_AGE_MS
+      ? "Awaiting live refresh"
+      : odometerRate !== 0 ? "Estimated · live refresh every 30 sec" : "Estimate unavailable · live refresh every 30 sec";
+  };
+
+  const pointText = (value, percent) => percent
+    ? `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 6 })}%`
+    : new Intl.NumberFormat().format(value);
+
+  window.renderChart = function renderChart(targetId, series, percent = false) {
+    const target = $(targetId);
+    const chartHistory = history;
+    const width = Math.max(300, target.clientWidth || 420);
+    const height = 260;
+    const left = 66, right = 12, top = 14, bottom = 38;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    const values = series.flatMap(item => item.values.map(point => point.value).filter(Number.isFinite));
+    if (!chartHistory.length || !values.length) {
+      target.innerHTML = '<div class="status">No graph snapshots yet.</div>';
+      return;
     }
 
-    function buildGrowthMap(growthList) {
-      const map = new Map();
-      for (const item of growthList) {
-        if (!item || item.cid === undefined || item.cid === null) continue;
-        const max = Number(item.subGainMax);
-        const min = Number(item.subGainMin);
-        if (!Number.isFinite(max) || !Number.isFinite(min)) continue;
-        map.set(String(item.cid), (max + min) / 2);
-      }
-      return map;
+    let min = Math.min(...values), max = Math.max(...values);
+    if (min === max) {
+      const padding = Math.abs(min) * .05 || 1;
+      min -= padding;
+      max += padding;
+    }
+    const x = index => left + (chartHistory.length <= 1 ? plotWidth / 2 : index / (chartHistory.length - 1) * plotWidth);
+    const y = value => top + (max - value) / (max - min) * plotHeight;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("class", "chart");
+    svg.setAttribute("role", "group");
+    svg.setAttribute("aria-label", "Drag or move across the graph to inspect snapshot values");
+    const add = (name, attrs) => {
+      const element = document.createElementNS("http://www.w3.org/2000/svg", name);
+      for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value);
+      svg.append(element);
+      return element;
+    };
+    const axis = value => percent
+      ? `${value.toLocaleString(undefined, { maximumFractionDigits: 3 })}%`
+      : new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 2 }).format(value);
+
+    for (let tick = 0; tick <= 4; tick++) {
+      const value = min + (max - min) * tick / 4;
+      const yy = y(value);
+      add("line", { x1: left, y1: yy, x2: width - right, y2: yy, class: "gridline" });
+      const label = add("text", { x: left - 8, y: yy + 4, "text-anchor": "end", class: "axis-label" });
+      label.textContent = axis(value);
+    }
+    for (const index of [...new Set([0, Math.floor((chartHistory.length - 1) / 2), chartHistory.length - 1])]) {
+      const date = new Date(chartHistory[index].timestamp);
+      const label = Number.isNaN(date.getTime()) ? String(index + 1) : selectedRange === "day"
+        ? date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+        : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const text = add("text", { x: x(index), y: height - 12, "text-anchor": "middle", class: "axis-label" });
+      text.textContent = label;
     }
 
-    function toNumber(value) {
-      const n = Number(value);
-      return Number.isFinite(n) ? n : 0;
-    }
+    series.forEach((item, seriesIndex) => {
+      const color = item.color || COLORS[seriesIndex % COLORS.length];
+      let path = "", drawing = false;
+      item.values.forEach((point, index) => {
+        if (!Number.isFinite(point.value)) { drawing = false; return; }
+        path += `${drawing ? " L" : "M"}${x(index)},${y(point.value)}`;
+        drawing = true;
+      });
+      add("path", { d: path, class: `series-line${item.dashed ? " dashed" : ""}`, stroke: color });
+    });
 
-    function formatCount(value) {
-      const n = Number(value);
-      return value !== "" && Number.isFinite(n) ? new Intl.NumberFormat().format(n) : String(value);
-    }
+    const cursor = add("line", { x1: x(0), y1: top, x2: x(0), y2: top + plotHeight, class: "scrub-line", visibility: "hidden" });
+    const activePoints = series.map(item => add("circle", { cx: x(0), cy: top, r: 5, fill: item.color, class: "active-point", visibility: "hidden" }));
+    const scrub = add("rect", {
+      x: left, y: top, width: plotWidth, height: plotHeight, class: "scrub-area",
+      tabindex: 0, role: "slider", "aria-label": "Select a historical graph data point",
+      "aria-valuemin": 1, "aria-valuemax": chartHistory.length, "aria-valuenow": 1
+    });
+    const tooltip = document.createElement("div");
+    tooltip.className = "chart-tooltip";
+    tooltip.hidden = true;
 
-    function buildRankMap(channels) {
-      const ranked = [...channels]
-        .filter((channel) => Number.isFinite(toNumber(channel.subscribers)))
-        .sort((a, b) => toNumber(b.subscribers) - toNumber(a.subscribers));
-      const rankMap = new Map();
-      ranked.forEach((channel, index) => rankMap.set(channel.id, index + 1));
-      return rankMap;
-    }
-
-    function formatShare(numerator, denominator) {
-      const percentage = denominator !== 0 ? (numerator / denominator) * 100 : 0;
-      return `${percentage.toLocaleString(undefined, { maximumFractionDigits: 6 })}%`;
-    }
-
-    function setStatus(message, kind) {
-      statusEl.textContent = message;
-      statusEl.className = `status${kind ? ` ${kind}` : ""}`;
-    }
-
-    async function loadStats() {
-      if (loading) return;
-      loading = true;
-      refreshButton.disabled = true;
-      setStatus("Loading channel statistics…");
-      emptyEl.hidden = true;
-      try {
-        const [dataResponse, growthResponse, configResponse] = await Promise.all([
-          fetch(DATA_URL, { cache: "no-store" }),
-          fetch(GROWTH_URL, { cache: "no-store" }),
-          fetch(CONFIG_URL, { cache: "no-store" })
-        ]);
-        if (!dataResponse.ok) throw new Error(`Stats endpoint returned HTTP ${dataResponse.status}.`);
-        if (!growthResponse.ok) throw new Error(`Growth endpoint returned HTTP ${growthResponse.status}.`);
-        if (!configResponse.ok) throw new Error(`Could not load channels.json (HTTP ${configResponse.status}).`);
-
-        const [payload, growthPayload, config] = await Promise.all([
-          dataResponse.json(),
-          growthResponse.json(),
-          configResponse.json()
-        ]);
-        const configuredIds = Array.isArray(config.channelIds) ? config.channelIds.map(String) : [];
-        const allowed = new Set(configuredIds);
-        const fullChannels = extractChannels(payload).map(normalizeChannel).filter(Boolean);
-        const growthById = buildGrowthMap(extractGrowthList(growthPayload));
-        const fullRankMap = buildRankMap(fullChannels);
-        const shownChannels = fullChannels.filter((channel) => allowed.size === 0 || allowed.has(channel.id));
-
-        const fullSubscribersTotal = fullChannels.reduce((sum, channel) => sum + toNumber(channel.subscribers), 0);
-        const shownSubscribersTotal = shownChannels.reduce((sum, channel) => sum + toNumber(channel.subscribers), 0);
-        const fullGrowthTotal = fullChannels.reduce((sum, channel) => sum + (growthById.get(channel.id) ?? 0), 0);
-        const shownGrowthTotal = shownChannels.reduce((sum, channel) => sum + (growthById.get(channel.id) ?? 0), 0);
-
-        const combinedSubscriberEntry = { id: "combined-subscribers", subscribers: shownSubscribersTotal };
-        const combinedSubscriberRank = buildRankMap([...fullChannels, combinedSubscriberEntry]).get(combinedSubscriberEntry.id) || 0;
-
-        rows.replaceChildren();
-        for (const channel of shownChannels) {
-          const tr = document.createElement("tr");
-          const growth = growthById.get(channel.id);
-          const values = [
-            channel.name,
-            channel.id,
-            `${formatCount(channel.subscribers)} (#${fullRankMap.get(channel.id) || 0})`,
-            growth === undefined ? "—" : formatCount(growth)
-          ];
-          for (const text of values) {
-            const td = document.createElement("td");
-            td.textContent = text;
-            tr.appendChild(td);
-          }
-          rows.appendChild(tr);
+    const selectIndex = requestedIndex => {
+      const index = Math.max(0, Math.min(chartHistory.length - 1, requestedIndex));
+      const px = x(index);
+      cursor.setAttribute("x1", px);
+      cursor.setAttribute("x2", px);
+      cursor.setAttribute("visibility", "visible");
+      let highestPoint = height;
+      const entries = [];
+      series.forEach((item, seriesIndex) => {
+        const point = item.values[index];
+        const marker = activePoints[seriesIndex];
+        if (!point || !Number.isFinite(point.value)) {
+          marker.setAttribute("visibility", "hidden");
+          return;
         }
-
-        const combinedTr = document.createElement("tr");
-        for (const text of [
-          "Combined totals",
-          "combined",
-          `${formatCount(shownSubscribersTotal)} (#${combinedSubscriberRank})`,
-          formatCount(shownGrowthTotal)
-        ]) {
-          const td = document.createElement("td");
-          td.textContent = text;
-          combinedTr.appendChild(td);
-        }
-        rows.appendChild(combinedTr);
-
-        countEl.textContent = new Intl.NumberFormat().format(shownChannels.length);
-        subscriberShareEl.textContent = formatShare(shownSubscribersTotal, fullSubscribersTotal);
-        growthShareEl.textContent = formatShare(shownGrowthTotal, fullGrowthTotal);
-        updatedEl.textContent = new Date().toLocaleTimeString();
-        emptyEl.hidden = shownChannels.length !== 0 || shownSubscribersTotal !== 0;
-        setStatus(`Loaded ${shownChannels.length} channel${shownChannels.length === 1 ? "" : "s"}.`, "ok");
-      } catch (error) {
-        setStatus(`${error.message} If this is a CORS error, the stats server must allow this page's origin.`, "error");
-        countEl.textContent = "—";
-        subscriberShareEl.textContent = "—";
-        growthShareEl.textContent = "—";
-        emptyEl.hidden = true;
-      } finally {
-        loading = false;
-        refreshButton.disabled = false;
+        const py = y(point.value);
+        highestPoint = Math.min(highestPoint, py);
+        marker.setAttribute("cx", px);
+        marker.setAttribute("cy", py);
+        marker.setAttribute("fill", item.color || COLORS[seriesIndex % COLORS.length]);
+        marker.setAttribute("visibility", "visible");
+        entries.push({ name: item.name, value: pointText(point.value, percent) });
+      });
+      tooltip.replaceChildren();
+      const date = new Date(chartHistory[index].timestamp);
+      const time = document.createElement("strong");
+      time.textContent = Number.isNaN(date.getTime()) ? `Snapshot ${index + 1}` : date.toLocaleString();
+      tooltip.append(time);
+      for (const entry of entries) {
+        const line = document.createElement("div");
+        line.textContent = series.length > 1 ? `${entry.name}: ${entry.value}` : entry.value;
+        tooltip.append(line);
       }
+      tooltip.hidden = entries.length === 0;
+      tooltip.classList.toggle("below", highestPoint < 60);
+      tooltip.style.left = `${Math.max(4, Math.min(target.clientWidth - 4, px / width * target.clientWidth))}px`;
+      tooltip.style.top = `${highestPoint}px`;
+      scrub.setAttribute("aria-valuenow", String(index + 1));
+      scrub.setAttribute("aria-valuetext", `${time.textContent}; ${entries.map(entry => `${entry.name}: ${entry.value}`).join(", ")}`);
+    };
+    const indexFromPointer = event => {
+      const point = svg.createSVGPoint();
+      point.x = event.clientX;
+      point.y = event.clientY;
+      const local = point.matrixTransform(svg.getScreenCTM().inverse());
+      selectIndex(Math.round(Math.max(0, Math.min(1, (local.x - left) / plotWidth)) * (history.length - 1)));
+    };
+    scrub.addEventListener("pointerdown", event => {
+      scrub.setPointerCapture(event.pointerId);
+      indexFromPointer(event);
+    });
+    scrub.addEventListener("pointermove", event => {
+      if (event.pointerType === "touch" && !scrub.hasPointerCapture(event.pointerId)) return;
+      indexFromPointer(event);
+    });
+    scrub.addEventListener("pointerup", event => {
+      if (scrub.hasPointerCapture(event.pointerId)) scrub.releasePointerCapture(event.pointerId);
+    });
+    scrub.addEventListener("pointerleave", event => {
+      if (event.pointerType !== "touch" && !scrub.hasPointerCapture(event.pointerId)) {
+        tooltip.hidden = true;
+        cursor.setAttribute("visibility", "hidden");
+        activePoints.forEach(point => point.setAttribute("visibility", "hidden"));
+      }
+    });
+    scrub.addEventListener("keydown", event => {
+      const current = Number(scrub.getAttribute("aria-valuenow"));
+      if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+        event.preventDefault();
+        selectIndex(current);
+      } else if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+        event.preventDefault();
+        selectIndex(current - 2);
+      }
+    });
+
+    target.replaceChildren(svg, tooltip);
+    const averages = series.filter(item => item.dashed);
+    if (averages.length) {
+      const legend = document.createElement("div");
+      legend.className = "chart-legend";
+      for (const item of averages) {
+        const entry = document.createElement("span");
+        entry.className = "legend-item";
+        const swatch = document.createElement("i");
+        swatch.className = "swatch dashed";
+        swatch.style.color = item.color;
+        swatch.classList.add("dashed");
+        const label = document.createElement("span");
+        label.textContent = item.name;
+        entry.append(swatch, label);
+        legend.append(entry);
+      }
+      target.append(legend);
+    }
+  };
+
+  const averageByClockMinute = (values, snapshots) => {
+    const totals = new Map();
+    values.forEach((point, index) => {
+      const timestamp = new Date(snapshots[index].timestamp);
+      if (!Number.isFinite(point.value) || Number.isNaN(timestamp.getTime())) return;
+      const minute = timestamp.getHours() * 60 + timestamp.getMinutes();
+      const aggregate = totals.get(minute) || { sum: 0, count: 0 };
+      aggregate.sum += point.value;
+      aggregate.count++;
+      totals.set(minute, aggregate);
+    });
+    return values.map((point, index) => {
+      const timestamp = new Date(snapshots[index].timestamp);
+      if (Number.isNaN(timestamp.getTime())) return { value: NaN };
+      const aggregate = totals.get(timestamp.getHours() * 60 + timestamp.getMinutes());
+      return { value: aggregate ? aggregate.sum / aggregate.count : NaN };
+    });
+  };
+
+  const median = values => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  };
+
+  const estimateTrend = (points, target) => {
+    const valid = points.filter(point => Number.isFinite(point.value) && Number.isFinite(point.timestamp));
+    if (!valid.length) return { date: null, fit: "No data" };
+    const latest = valid.reduce((newest, point) => point.timestamp > newest.timestamp ? point : newest);
+    const recent = valid.filter(point => point.timestamp >= latest.timestamp - 24 * 60 * 60 * 1000);
+    const buckets = new Map();
+    for (const point of recent) {
+      const bucket = Math.floor(point.timestamp / (30 * 60 * 1000));
+      if (!buckets.has(bucket)) buckets.set(bucket, []);
+      buckets.get(bucket).push(point.value);
+    }
+    const samples = [...buckets].map(([bucket, values]) => ({
+      timestamp: (bucket + .5) * 30 * 60 * 1000,
+      value: median(values)
+    })).sort((a, b) => a.timestamp - b.timestamp);
+    if (samples.length < 12 || samples.at(-1).timestamp - samples[0].timestamp < 6 * 60 * 60 * 1000) {
+      return { date: null, fit: "Not enough history" };
     }
 
-    refreshButton.addEventListener("click", loadStats);
-    loadStats();
-    setInterval(loadStats, REFRESH_INTERVAL_MS);
-  </script>
+    const origin = samples[0].timestamp;
+    const hours = samples.map(sample => (sample.timestamp - origin) / (60 * 60 * 1000));
+    const meanHours = hours.reduce((sum, value) => sum + value, 0) / hours.length;
+    const meanValue = samples.reduce((sum, sample) => sum + sample.value, 0) / samples.length;
+    const covariance = samples.reduce((sum, sample, index) => sum + (hours[index] - meanHours) * (sample.value - meanValue), 0);
+    const variance = hours.reduce((sum, value) => sum + (value - meanHours) ** 2, 0);
+    const slope = covariance / variance;
+    const residual = samples.reduce((sum, sample, index) => {
+      const predicted = meanValue + slope * (hours[index] - meanHours);
+      return sum + (sample.value - predicted) ** 2;
+    }, 0);
+    const total = samples.reduce((sum, sample) => sum + (sample.value - meanValue) ** 2, 0);
+    const fit = total ? Math.max(0, 1 - residual / total) : 0;
+    if (fit < .65) return { date: null, fit: "Unstable" };
+    if (!(slope > 0)) return { date: null, fit: "No upward trend" };
+    const hoursToTarget = (target - latest.value) / slope;
+    if (!(hoursToTarget > 0) || hoursToTarget > 14 * 24) return { date: null, fit: "Beyond 14-day window" };
+    return {
+      date: new Date(latest.timestamp + hoursToTarget * 60 * 60 * 1000),
+      fit: fit >= .85 ? "Strong" : "Moderate"
+    };
+  };
+
+  window.renderMilestones = function renderMilestones(snapshots) {
+    const rows = $("milestone-rows");
+    if (!snapshots.length) return;
+    const metrics = [
+      { key: "subscriberShare", name: "Subscriber share", step: 1, format: value => `${value.toFixed(2)}%`, value: snapshot => Number(snapshot.subscriberShare) },
+      { key: "growthShare", name: "Growth share", step: 1, format: value => `${value.toFixed(2)}%`, value: snapshot => Number(snapshot.growthShare) },
+      { key: "totalSubscribers", name: "Total subscribers", step: 1e9, format: compact, value: snapshot => Number(snapshot.totalSubscribers) },
+      { key: "totalGrowth", name: "Total growth", step: 1e8, format: compact, value: snapshot => Number(snapshot.totalGrowth) },
+      { key: "globalGrowth", name: "Global growth", step: 1e9, format: compact, value: snapshot => Number(snapshot.totalGrowth) / (Number(snapshot.growthShare) / 100) }
+    ];
+    const channelIds = new Map();
+    for (const snapshot of snapshots) {
+      for (const item of Array.isArray(snapshot.channelSubscribers) ? snapshot.channelSubscribers : []) {
+        const id = channelId(item);
+        if (!channelIds.has(id)) channelIds.set(id, item.channelName || id);
+      }
+    }
+    for (const [id, name] of channelIds) {
+      metrics.push({
+        name: `${name} subscribers`,
+        key: `channelSubscribers:${id}`,
+        step: 1e9,
+        format: compact,
+        value: snapshot => {
+          const item = (Array.isArray(snapshot.channelSubscribers) ? snapshot.channelSubscribers : []).find(channel => channelId(channel) === id);
+          return item ? Number(item.value ?? item.subscribers) : NaN;
+        }
+      });
+    }
+
+    const channelGrowthIds = new Map();
+    for (const snapshot of snapshots) {
+      for (const item of Array.isArray(snapshot.channelGrowth) ? snapshot.channelGrowth : []) {
+        const id = channelId(item);
+        if (!channelGrowthIds.has(id)) channelGrowthIds.set(id, item.channelName || id);
+      }
+    }
+    for (const [id, name] of channelGrowthIds) {
+      metrics.push({
+        key: `channelGrowth:${id}`,
+        name: `${name} growth`,
+        format: compact,
+        calculatorOnly: true,
+        value: snapshot => {
+          const item = (Array.isArray(snapshot.channelGrowth) ? snapshot.channelGrowth : []).find(channel => channelId(channel) === id);
+          return item ? Number(item.value ?? item.growth) : NaN;
+        }
+      });
+    }
+
+    const metricSelect = $("milestone-metric");
+    const selectedMetric = metricSelect.value;
+    metricSelect.replaceChildren();
+    for (const metric of metrics) {
+      const option = document.createElement("option");
+      option.value = metric.key;
+      option.textContent = metric.name;
+      metricSelect.append(option);
+    }
+    if (metrics.some(metric => metric.key === selectedMetric)) metricSelect.value = selectedMetric;
+    milestoneMetrics = metrics;
+
+    rows.replaceChildren();
+    for (const metric of metrics.filter(item => !item.calculatorOnly)) {
+      const points = snapshots.map(snapshot => ({ timestamp: Date.parse(snapshot.timestamp), value: metric.value(snapshot) }));
+      const latest = points.reduce((newest, point) => Number.isFinite(point.value) && Number.isFinite(point.timestamp) && (!newest || point.timestamp > newest.timestamp) ? point : newest, null);
+      const tr = document.createElement("tr");
+      const target = latest ? (Math.floor(latest.value / metric.step) + 1) * metric.step : NaN;
+      const estimate = latest ? estimateTrend(points, target) : { date: null, fit: "No data" };
+      const cells = [
+        metric.name,
+        latest ? metric.format(target) : "—",
+        estimate.date ? estimate.date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Unavailable",
+        estimate.fit
+      ];
+      for (const value of cells) {
+        const td = document.createElement("td");
+        td.textContent = value;
+        tr.append(td);
+      }
+      rows.append(tr);
+    }
+  };
+
+  $("milestone-calculator").addEventListener("submit", event => {
+    event.preventDefault();
+    const metric = milestoneMetrics.find(item => item.key === $("milestone-metric").value);
+    const target = Number($("milestone-target").value);
+    const result = $("milestone-result");
+    if (!metric || !Number.isFinite(target)) {
+      result.textContent = "Enter a valid target value.";
+      return;
+    }
+
+    const points = history.map(snapshot => ({ timestamp: Date.parse(snapshot.timestamp), value: metric.value(snapshot) }));
+    const valid = points.filter(point => Number.isFinite(point.timestamp) && Number.isFinite(point.value));
+    if (!valid.length) {
+      result.textContent = "No history is available for this metric.";
+      return;
+    }
+    const latest = valid.reduce((newest, point) => point.timestamp > newest.timestamp ? point : newest);
+    const formattedTarget = metric.format(target);
+    if (target <= latest.value) {
+      const reached = valid.filter(point => point.value >= target).sort((a, b) => a.timestamp - b.timestamp)[0];
+      const reachedAt = new Date(reached?.timestamp ?? latest.timestamp).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      result.textContent = `${metric.name} reached ${formattedTarget} on ${reachedAt}.`;
+      return;
+    }
+
+    const estimate = estimateTrend(points, target);
+    result.textContent = estimate.date
+      ? `Estimated ${metric.name} reaches ${formattedTarget} on ${estimate.date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} (${estimate.fit.toLowerCase()} trend fit).`
+      : `No reliable estimate for ${metric.name}: ${estimate.fit.toLowerCase()}.`;
+  });
+
+  const compact = value => new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+
+  window.renderCharts = function renderCharts() {
+    const allHistory = history;
+    const newestTimestamp = Math.max(...allHistory.map(snapshot => Date.parse(snapshot.timestamp)).filter(Number.isFinite));
+    const visibleIndices = allHistory
+      .map((snapshot, index) => ({ snapshot, index, timestamp: Date.parse(snapshot.timestamp) }))
+      .filter(item => selectedRange === "all" || (Number.isFinite(item.timestamp) && item.timestamp >= newestTimestamp - 24 * 60 * 60 * 1000))
+      .map(item => item.index);
+    const selectRange = values => visibleIndices.map(index => values[index]);
+    history = visibleIndices.map(index => allHistory[index]);
+
+    try {
+    const scalar = (key, id, label, color, percent = false) => {
+      const allValues = allHistory.map(snapshot => ({ value: Number(snapshot[key]) }));
+      const lines = [{ name: label, color, values: selectRange(allValues) }];
+      if (key === "growthShare") lines.push({ name: "Average at this time", color: "#d2a8ff", dashed: true, values: selectRange(averageByClockMinute(allValues, allHistory)) });
+      window.renderChart(id, lines, percent);
+    };
+    scalar("subscriberShare", "chart-subscriber-share", "Subscriber share", COLORS[0], true);
+    scalar("growthShare", "chart-growth-share", "Growth share", COLORS[1], true);
+    scalar("totalSubscribers", "chart-total-subscribers", "Total subscribers", COLORS[2]);
+    scalar("totalGrowth", "chart-total-growth", "Total growth", COLORS[3]);
+    const allGlobalValues = allHistory.map(snapshot => {
+      const share = Number(snapshot.growthShare), total = Number(snapshot.totalGrowth);
+      return { value: Number.isFinite(share) && share !== 0 && Number.isFinite(total) ? total / (share / 100) : NaN };
+    });
+    window.renderChart("chart-global-growth", [
+      { name: "Global growth", color: COLORS[4], values: selectRange(allGlobalValues) },
+      { name: "Average at this time", color: "#d2a8ff", dashed: true, values: selectRange(averageByClockMinute(allGlobalValues, allHistory)) }
+    ]);
+    groupedSeries("channelSubscribers", "chart-channel-subscribers", "legend-channel-subscribers");
+    groupedSeries("channelGrowth", "chart-channel-growth", "legend-channel-growth");
+    } finally {
+      history = allHistory;
+    }
+    window.renderMilestones(allHistory);
+  };
+  document.querySelectorAll("[data-graph-range]").forEach(button => {
+    button.addEventListener("click", () => {
+      selectedRange = button.dataset.graphRange;
+      document.querySelectorAll("[data-graph-range]").forEach(option => option.setAttribute("aria-pressed", String(option === button)));
+      window.renderCharts();
+    });
+  });
+  window.addEventListener("resize", window.renderCharts);
+  window.renderCharts();
+  updateSubscriberOdometer();
+  window.setInterval(updateSubscriberOdometer, ODOMETER_REFRESH_MS);
+})();
+</script>
 </body>
 </html>
