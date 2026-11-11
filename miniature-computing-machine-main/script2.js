@@ -7,7 +7,7 @@
   const INTERVAL_COLLAB_MS = 300100;  // How often Collab runs (e.g., every 1 second)
   
   // Target channel IDs array (Add as many IDs as you want here)
-  const TARGET_CHANNEL_IDS = ["UCxiRWENenyIMMf4dbUIlQrg","UCtFzNT49dXrNRE9m7llHwgQ"];
+  const TARGET_CHANNEL_IDS = ["UCtFzNT49dXrNRE9m7llHwgQ","UCxiRWENenyIMMf4dbUIlQrg"];
   // =========================================================
 
   function extractConst(name, scriptsText) {
