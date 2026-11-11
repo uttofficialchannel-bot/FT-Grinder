@@ -4,27 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       target_url:
-        description: 'Target URL to visit'
-        required: true
-        default: 'https://grinding.tnstats.dev/'
-        type: string
-      script_files:
-        description: 'Script files to load'
+        description: "URL to open before evaluating script.js"
         required: false
-        default: 'script.js'
-        type: string
+        default: "https://grinding.tnstats.dev/"
       local_storage_json:
-        description: 'Local storage JSON payload'
+        description: "JSON object of localStorage key/value pairs to set before script.js runs. Example: {\"theme\":\"dark\",\"settings\":{\"sound\":true}}"
         required: false
-        default: '{}'
-        type: string
+        default: "{}"
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./miniature-computing-machine-main
+    timeout-minutes: 360
 
     steps:
       - name: Check out repository
@@ -33,13 +24,16 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "20"
 
       - name: Install dependencies
         run: npm install
 
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
 
-      - name: Run script
-        run: node runner.js
+      - name: Visit page and run script.js
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+          LOCAL_STORAGE_JSON: ${{ inputs.local_storage_json }}
+        run: npm run run
